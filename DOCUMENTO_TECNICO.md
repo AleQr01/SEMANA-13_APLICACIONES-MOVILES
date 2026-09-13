@@ -46,7 +46,18 @@ class HttpClientFactory {
     );
 
     return Dio(options);
-2. Cadena de Interceptores y Orden de EjecuciónLos interceptores se registran en una secuencia estricta para garantizar que la autenticación y la gestión de errores se apliquen correctamente:AuthInterceptor: Lee el Access Token del almacenamiento cifrado (FlutterSecureStorage) e inyecta la cabecera Authorization: Bearer <token> en cada petición saliente.TokenRefreshInterceptor (QueuedInterceptor): Escucha las respuestas de error 401 Unauthorized. Pausa la cola de peticiones, llama al endpoint /auth/refresh y reintenta la petición fallida.Protección contra bucles infinitos: Marca la petición reintentada con requestOptions.extra['is_retry'] = true. Si una solicitud reintentada vuelve a devolver 401, se fuerza el cierre de sesión y no se intenta renovar nuevamente.LogInterceptor: Muestra información de depuración en consola durante el desarrollo.Dart// lib/core/network/interceptors/token_refresh_interceptor.dart
+
+## 2. Cadena de Interceptores y Orden de Ejecución
+
+Los interceptores se registran en una secuencia estricta para garantizar que la autenticación y la gestión de errores se apliquen correctamente:
+
+1. **`AuthInterceptor`:** Lee el *Access Token* del almacenamiento cifrado (`FlutterSecureStorage`) e inyecta la cabecera `Authorization: Bearer <token>` en cada petición saliente.
+2. **`TokenRefreshInterceptor` (`QueuedInterceptor`):** Escucha las respuestas de error `401 Unauthorized`. Pausa la cola de peticiones, llama al endpoint `/auth/refresh` y reintenta la petición fallida.
+   * **Protección contra bucles infinitos:** Marca la petición reintentada con `requestOptions.extra['is_retry'] = true`. Si una solicitud reintentada vuelve a devolver 401, se fuerza el cierre de sesión y no se intenta renovar nuevamente.
+3. **`LogInterceptor`:** Muestra información de depuración en consola durante el desarrollo.
+
+```dart
+// lib/core/network/interceptors/token_refresh_interceptor.dart
 class TokenRefreshInterceptor extends QueuedInterceptor {
   final Dio dio;
   final SecureStorageService storage;
@@ -97,16 +108,3 @@ class TokenRefreshInterceptor extends QueuedInterceptor {
     handler.next(err);
   }
 }
-## 3. Tabla de Correspondencia entre Campos (Servidor vs. Cliente)
-
-Para resolver las discrepancias de nomenclatura entre la convención del API (*snake_case*) y el modelo en Flutter (*camelCase*), se mapean las entidades mediante `@JsonKey`:
-
-| Campo Servidor (*snake_case*) | Campo Cliente (*camelCase*) | Tipo de Dato | Estrategia de Mapeo |
-| :--- | :--- | :--- | :--- |
-| `product_id` | `id` | `String` | `@JsonKey(name: 'product_id')` |
-| `product_name` | `name` | `String` | `@JsonKey(name: 'product_name')` |
-| `unit_price` | `price` | `double` | `@JsonKey(name: 'unit_price')` |
-| `is_available` | `isAvailable` | `bool` | `@JsonKey(name: 'is_available')` |
-| `created_at` | `createdAt` | `DateTime` | Parsing automático ISO-8601 |
-
-![Modelo DTO de Datos](captura3.png.png)
