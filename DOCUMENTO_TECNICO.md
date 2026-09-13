@@ -46,5 +46,67 @@ class HttpClientFactory {
     );
 
     return Dio(options);
+2. Cadena de Interceptores y Orden de EjecuciónLos interceptores se registran en una secuencia estricta para garantizar que la autenticación y la gestión de errores se apliquen correctamente:AuthInterceptor: Lee el Access Token del almacenamiento cifrado (FlutterSecureStorage) e inyecta la cabecera Authorization: Bearer <token> en cada petición saliente.TokenRefreshInterceptor (QueuedInterceptor): Escucha las respuestas de error 401 Unauthorized. Pausa la cola de peticiones, llama al endpoint /auth/refresh y reintenta la petición fallida.Protección contra bucles infinitos: Marca la petición reintentada con requestOptions.extra['is_retry'] = true. Si una solicitud reintentada vuelve a devolver 401, se fuerza el cierre de sesión y no se intenta renovar nuevamente.LogInterceptor: Muestra información de depuración en consola durante el desarrollo.Dart// lib/core/network/interceptors/token_refresh_interceptor.dart
+class TokenRefreshInterceptor extends QueuedInterceptor {
+  final Dio dio;
+  final SecureStorageService storage;
+
+  TokenRefreshInterceptor({required this.dio, required this.storage});
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode == 401) {
+      final requestOptions = err.requestOptions;
+
+      // Validación para evitar bucles infinitos de reintentos
+      final isAlreadyRetried = requestOptions.extra['is_retry'] == true;
+      final isRefreshEndpoint = requestOptions.path.contains('/auth/refresh');
+
+      if (isAlreadyRetried || isRefreshEndpoint) {
+        await storage.clearAll();
+        return handler.next(err);
+      }
+
+      try {
+        final refreshToken = await storage.getRefreshToken();
+        if (refreshToken == null) {
+          await storage.clearAll();
+          return handler.next(err);
+        }
+
+        final refreshDio = Dio(BaseOptions(baseUrl: dio.options.baseUrl));
+        final response = await refreshDio.post('/auth/refresh', data: {'refresh_token': refreshToken});
+
+        if (response.statusCode == 200) {
+          final newAccessToken = response.data['access_token'];
+          final newRefreshToken = response.data['refresh_token'];
+
+          await storage.saveTokens(accessToken: newAccessToken, refreshToken: newRefreshToken);
+
+          // Marca explícita para evitar bucles
+          requestOptions.extra['is_retry'] = true;
+          requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+
+          final clonedResponse = await dio.fetch(requestOptions);
+          return handler.resolve(clonedResponse);
+        }
+      } catch (e) {
+        await storage.clearAll();
+      }
+    }
+    handler.next(err);
   }
 }
+## 3. Tabla de Correspondencia entre Campos (Servidor vs. Cliente)
+
+Para resolver las discrepancias de nomenclatura entre la convención del API (*snake_case*) y el modelo en Flutter (*camelCase*), se mapean las entidades mediante `@JsonKey`:
+
+| Campo Servidor (*snake_case*) | Campo Cliente (*camelCase*) | Tipo de Dato | Estrategia de Mapeo |
+| :--- | :--- | :--- | :--- |
+| `product_id` | `id` | `String` | `@JsonKey(name: 'product_id')` |
+| `product_name` | `name` | `String` | `@JsonKey(name: 'product_name')` |
+| `unit_price` | `price` | `double` | `@JsonKey(name: 'unit_price')` |
+| `is_available` | `isAvailable` | `bool` | `@JsonKey(name: 'is_available')` |
+| `created_at` | `createdAt` | `DateTime` | Parsing automático ISO-8601 |
+
+![Modelo DTO de Datos](captura3.png.png)
