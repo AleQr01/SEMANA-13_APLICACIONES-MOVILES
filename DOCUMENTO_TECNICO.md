@@ -46,6 +46,7 @@ class HttpClientFactory {
     );
 
     return Dio(options);
+---
 
 ## 2. Cadena de Interceptores y Orden de Ejecución
 
@@ -55,6 +56,7 @@ Los interceptores se registran en una secuencia estricta para garantizar que la 
 2. **`TokenRefreshInterceptor` (`QueuedInterceptor`):** Escucha las respuestas de error `401 Unauthorized`. Pausa la cola de peticiones, llama al endpoint `/auth/refresh` y reintenta la petición fallida.
    * **Protección contra bucles infinitos:** Marca la petición reintentada con `requestOptions.extra['is_retry'] = true`. Si una solicitud reintentada vuelve a devolver 401, se fuerza el cierre de sesión y no se intenta renovar nuevamente.
 3. **`LogInterceptor`:** Muestra información de depuración en consola durante el desarrollo.
+
 
 ```dart
 // lib/core/network/interceptors/token_refresh_interceptor.dart
