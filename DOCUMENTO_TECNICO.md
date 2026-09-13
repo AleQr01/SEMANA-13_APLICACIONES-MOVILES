@@ -48,6 +48,7 @@ class HttpClientFactory {
 
 
 ![Configuración del Cliente HTTP](captura1.png.png)
+
 2. Cadena de Interceptores y Orden de Ejecución
 Los interceptores se registran en una secuencia estricta para garantizar que la autenticación y la gestión de errores se apliquen correctamente:
 AuthInterceptor: Lee el Access Token del almacenamiento cifrado (FlutterSecureStorage) e inyecta la cabecera Authorization: Bearer <token> en cada petición saliente.
@@ -108,6 +109,7 @@ class TokenRefreshInterceptor extends QueuedInterceptor {
 
 
 ![Interceptor y Renovación de Token](captura2.png.png)
+
 3. Tabla de Correspondencia entre Campos (Servidor vs. Cliente)
 Para resolver las discrepancias de nomenclatura entre la convención del API (snake_case) y el modelo en Flutter (camelCase), se mapean las entidades mediante @JsonKey:
 Campo Servidor (snake_case)
@@ -138,6 +140,7 @@ Parsing automático ISO-8601
 
 
 ![Modelo DTO de Datos](captura3.png.png)
+
 4. Traducción de Errores e Idempotencia
 Las excepciones devueltas por el cliente HTTP se mapean a cuatro familias de fallos del dominio:
 NetworkFailure (Conexión): Timeouts o pérdida de red.
@@ -147,6 +150,7 @@ ValidationFailure (Validación): Código HTTP 422 con deserialización del mapa 
 Garantía de Idempotencia en la Creación de Registros
 Las peticiones POST de creación generan un UUID único en el cliente antes de enviarse al servidor. Si la petición falla por falta de internet, la operación se guarda en la Cola de Salida (Outbox Queue) local manteniendo dicho UUID para evitar la duplicación de registros al resincronizar.
 ![Traducción de Excepciones de Red](captura4.png.png)
+
 5. Matriz de Verificación de Seguridad
 Criterio de Seguridad
 Estado
