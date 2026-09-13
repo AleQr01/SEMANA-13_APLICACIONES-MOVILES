@@ -1,8 +1,12 @@
-DOCUMENTO TÉCNICO DE ARQUITECTURA HTTP Y RED
-Asignatura: Desarrollo Móvil Avanzado
-Estudiante: AleQr01
+*DOCUMENTO TÉCNICO DE ARQUITECTURA HTTP Y RED*
+
+*Asignatura:* Desarrollo Móvil Avanzado
+*Estudiante:* Alex Dario Quilligana Ruiz 
+
 Enlace al Repositorio: https://github.com/AleQr01/SEMANA-13_APLICACIONES-MOVILES
-1. Selección y Configuración del Cliente HTTP
+
+*1. Selección y Configuración del Cliente HTTP*
+   
 Justificación de la Elección
 Se ha seleccionado Dio como cliente HTTP para el proyecto debido a las siguientes razones técnicas:
 Soporte de QueuedInterceptor: Permite detener y encolar solicitudes concurrentes mientras se ejecuta la renovación asíncrona del token tras un error HTTP 401.
