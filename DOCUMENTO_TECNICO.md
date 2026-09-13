@@ -46,5 +46,71 @@ class HttpClientFactory {
     );
 
     return Dio(options);
+![Configuración del Cliente HTTP](captura1.png.png).
+
+---
+
+## 2. Cadena de Interceptores y Orden de Ejecución
+
+Los interceptores se registran en una secuencia estricta para garantizar que la autenticación y la gestión de errores se apliquen correctamente:
+
+1. **AuthInterceptor:** Lee el Access Token del almacenamiento cifrado (FlutterSecureStorage) e inyecta la cabecera `Authorization: Bearer <token>` en cada petición saliente.
+
+2. **TokenRefreshInterceptor (QueuedInterceptor):** Escucha las respuestas de error 401 Unauthorized. Pausa la cola de peticiones, llama al endpoint `/auth/refresh` y reintenta la petición fallida.
+
+   * **Protección contra bucles infinitos:** Marca la petición reintentada con `requestOptions.extra['is_retry'] = true`. Si una solicitud reintentada vuelve a devolver 401, se fuerza el cierre de sesión y no se intenta renovar nuevamente.
+
+3. **LogInterceptor:** Muestra información de depuración en consola durante el desarrollo.
+
+```dart
+// lib/core/network/interceptors/token_refresh_interceptor.dart
+class TokenRefreshInterceptor extends QueuedInterceptor {
+  final Dio dio;
+  final SecureStorageService storage;
+
+  TokenRefreshInterceptor({required this.dio, required this.storage});
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode == 401) {
+      final requestOptions = err.requestOptions;
+
+      final isAlreadyRetried = requestOptions.extra['is_retry'] == true;
+      final isRefreshEndpoint = requestOptions.path.contains('/auth/refresh');
+
+      if (isAlreadyRetried || isRefreshEndpoint) {
+        await storage.clearAll();
+        return handler.next(err);
+      }
+
+      try {
+        final refreshToken = await storage.getRefreshToken();
+        if (refreshToken == null) {
+          await storage.clearAll();
+          return handler.next(err);
+        }
+
+        final refreshDio = Dio(BaseOptions(baseUrl: dio.options.baseUrl));
+        final response = await refreshDio.post('/auth/refresh', data: {'refresh_token': refreshToken});
+
+        if (response.statusCode == 200) {
+          final newAccessToken = response.data['access_token'];
+          final newRefreshToken = response.data['refresh_token'];
+
+          await storage.saveTokens(accessToken: newAccessToken, refreshToken: newRefreshToken);
+
+          requestOptions.extra['is_retry'] = true;
+          requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+
+          final clonedResponse = await dio.fetch(requestOptions);
+          return handler.resolve(clonedResponse);
+        }
+      } catch (e) {
+        await storage.clearAll();
+      }
+    }
+    handler.next(err);
+  }
+}
   }
 }
