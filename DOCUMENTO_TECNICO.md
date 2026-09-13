@@ -46,6 +46,7 @@ class HttpClientFactory {
     );
 
     return Dio(options);
+
 ---
 
 
