@@ -47,8 +47,9 @@ class HttpClientFactory {
 
     return Dio(options);
 
-![Configuración del Cliente HTTP](captura1.png.png)
+```
 
+![Configuración del Cliente HTTP](captura1.png.png)
 
 ---
 
