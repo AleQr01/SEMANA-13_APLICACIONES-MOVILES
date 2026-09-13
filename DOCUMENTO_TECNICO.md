@@ -117,3 +117,52 @@ class TokenRefreshInterceptor extends QueuedInterceptor {
 }
   }
 }
+```
+
+![Interceptor y Renovación de Token](captura2.png.png)
+
+---
+
+## 3. Tabla de Correspondencia entre Campos (Servidor vs. Cliente)
+
+Para resolver las discrepancias de nomenclatura entre la convención del API (*snake_case*) y el modelo en Flutter (*camelCase*), se mapean las entidades mediante `@JsonKey`:
+
+| Campo Servidor (*snake_case*) | Campo Cliente (*camelCase*) | Tipo de Dato | Estrategia de Mapeo |
+| :--- | :--- | :--- | :--- |
+| `product_id` | `id` | `String` | `@JsonKey(name: 'product_id')` |
+| `product_name` | `name` | `String` | `@JsonKey(name: 'product_name')` |
+| `unit_price` | `price` | `double` | `@JsonKey(name: 'unit_price')` |
+| `is_available` | `isAvailable` | `bool` | `@JsonKey(name: 'is_available')` |
+| `created_at` | `createdAt` | `DateTime` | Parsing automático ISO-8601 |
+
+![Modelo DTO de Datos](captura3.png.png)
+
+---
+
+## 4. Traducción de Errores e Idempotencia
+
+Las excepciones devueltas por el cliente HTTP se mapean a cuatro familias de fallos del dominio:
+
+* **`NetworkFailure` (Conexión):** Timeouts o pérdida de red.
+* **`ServerFailure` (Servidor):** Códigos HTTP 5xx.
+* **`AuthFailure` (Autenticación):** Códigos HTTP 401 y 403.
+* **`ValidationFailure` (Validación):** Código HTTP 422 con deserialización del mapa de errores por campo.
+
+### Garantía de Idempotencia en la Creación de Registros
+Las peticiones `POST` de creación generan un UUID único en el cliente antes de enviarse al servidor. Si la petición falla por falta de internet, la operación se guarda en la **Cola de Salida (*Outbox Queue*)** local manteniendo dicho UUID para evitar la duplicación de registros al resincronizar.
+
+![Traducción de Excepciones de Red](captura4.png.png)
+
+---
+
+## 5. Matriz de Verificación de Seguridad
+
+| Criterio de Seguridad | Estado | Método de Verificación / Implementación |
+| :--- | :---: | :--- |
+| **Ausencia de Claves Expuestas** | **Cumplido** | Las URLs y claves se inyectan mediante variables de entorno en compilación. |
+| **Logs Desactivados en Prod** | **Cumplido** | `if (!kReleaseMode) dio.interceptors.add(LogInterceptor());` |
+| **Obligatoriedad de HTTPS** | **Cumplido** | Validación en `HttpClientFactory` que bloquea peticiones HTTP en entorno `prod`. |
+| **Almacenamiento Cifrado** | **Cumplido** | Uso de `FlutterSecureStorage` (Keychain para iOS / EncryptedSharedPreferences para Android). |
+| **Control de Bucles 401** | **Cumplido** | Inyección de la bandera `is_retry` en la solicitud reintentada. |
+
+![Aplicación Ejecutándose](captura5.png.png)
